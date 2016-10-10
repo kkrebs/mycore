@@ -1,8 +1,5 @@
 package org.mycore.mets.iiif;
 
-import java.io.IOException;
-import java.nio.file.Files;
-
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.jdom2.Document;
@@ -26,6 +23,9 @@ import org.mycore.iiif.presentation.impl.MCRIIIFPresentationImpl;
 import org.mycore.iiif.presentation.model.basic.MCRIIIFManifest;
 import org.xml.sax.SAXException;
 
+import java.io.IOException;
+import java.nio.file.Files;
+
 public class MCRMetsIIIFPresentationImpl extends MCRIIIFPresentationImpl {
 
     private static final String TRANSFORMER_ID_CONFIGURATION_KEY = "Transformer";
@@ -41,18 +41,19 @@ public class MCRMetsIIIFPresentationImpl extends MCRIIIFPresentationImpl {
         try {
             Document metsDocument = getMets(id);
             LOGGER.info(new XMLOutputter(Format.getPrettyFormat()).outputString(metsDocument));
-            return new MCRMetsMods2IIIFConverter(metsDocument, id).convert();
-
+            return getConverter(id, metsDocument).convert();
         } catch (IOException|JDOMException|SAXException e) {
             throw new MCRException(e);
         }
     }
 
+    protected MCRMetsMods2IIIFConverter getConverter(String id, Document metsDocument) {
+        return new MCRMetsMods2IIIFConverter(metsDocument, id);
+    }
+
     protected MCRContentTransformer getTransformer() {
         String transformerID = getProperties().get(TRANSFORMER_ID_CONFIGURATION_KEY);
         MCRContentTransformer transformer = MCRContentTransformerFactory.getTransformer(transformerID);
-
-
 
         if (transformer == null) {
             throw new MCRConfigurationException("Could not resolve transformer with id : " + transformerID);
