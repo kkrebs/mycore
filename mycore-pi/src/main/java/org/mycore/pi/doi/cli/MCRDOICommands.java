@@ -2,6 +2,7 @@ package org.mycore.pi.doi.cli;
 
 import java.net.URI;
 import java.text.MessageFormat;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Date;
 import java.util.HashMap;
@@ -28,6 +29,7 @@ import org.mycore.pi.doi.MCRDOIParser;
 import org.mycore.pi.doi.MCRDOIRegistrationService;
 import org.mycore.pi.doi.MCRDataciteClient;
 import org.mycore.pi.doi.MCRDigitalObjectIdentifier;
+import org.mycore.pi.exceptions.MCRIdentifierUnresolvableException;
 import org.mycore.pi.exceptions.MCRPersistentIdentifierException;
 
 @MCRCommandGroup(name = "DOI Commands")
@@ -36,7 +38,9 @@ public class MCRDOICommands {
     private static final Logger LOGGER = LogManager.getLogger();
     private static final String REPAIR_MEDIALIST_OF_0_AND_SERVICE_1 = "repair medialist of {0} and service {1}";
 
-    @MCRCommand(syntax = "repair incomplete registered doi {0} with registration Service {1}")
+    @MCRCommand(syntax = "repair incomplete registered doi {0} with registration service {1}",
+        help = "Use this method if a DOI is registered, but not inserted in the Database. {0} is the DOI and "
+            + "{1} the registration service from configuration.")
     public static void repairIncompleteRegisteredDOI(String doiString, String serviceID)
         throws MCRPersistentIdentifierException, MCRAccessException, MCRActiveLinkException {
         MCRDOIRegistrationService registrationService = new MCRDOIRegistrationService(serviceID);
@@ -165,12 +169,24 @@ public class MCRDOICommands {
                 if (MCRMetadataManager.exists(objectID)) {
                     MCRObject obj = MCRMetadataManager.retrieveMCRObject(objectID);
                     List<Map.Entry<String, URI>> newMediaList = registrationService.getMediaList(obj);
-                    List<Map.Entry<String, URI>> oldMediaList = dataciteClient.getMediaList(doi);
+
+                    List<Map.Entry<String, URI>> oldMediaList;
+                    try {
+                        oldMediaList = dataciteClient.getMediaList(doi);
+                    } catch (MCRIdentifierUnresolvableException e) {
+                        LOGGER.warn(doi.toString() + " had no media list!");
+                        oldMediaList = new ArrayList<>();
+                    }
 
                     HashMap<String, URI> newHashMap = new HashMap<>();
 
                     newMediaList.forEach(e -> newHashMap.put(e.getKey(), e.getValue()));
                     oldMediaList.forEach(e -> {
+                        /*
+                        Currently it is not possible to delete inserted values key values (mime types).
+                        So we update old media mimetypes which are not present in new list to the same URL of the first
+                        mimetype entry.
+                        */
                         if (!newHashMap.containsKey(e.getKey())) {
                             newHashMap.put(e.getKey(), newMediaList.stream().findFirst().orElseThrow(() -> new MCRException("new media list is empty (this should not happen)")).getValue());
                         }
